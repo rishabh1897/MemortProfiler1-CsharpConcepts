@@ -13,55 +13,56 @@ namespace ProfileSample.Controllers
     {
         public ActionResult Index()
         {
-            var context = new ProfileSampleEntities();
-
-            var sources = context.ImgSources.Take(20).Select(x => x.Id);
-            
-            var model = new List<ImageModel>();
-
-            foreach (var id in sources)
+            using (var context = new ProfileSampleEntities())
             {
-                var item = context.ImgSources.Find(id);
-
-                var obj = new ImageModel()
+                var sources = context.ImgSources.Take(20).Select(x => x.Id).ToList();
+                var model = sources.Select(id =>
                 {
-                    Name = item.Name,
-                    Data = item.Data
-                };
-
-                model.Add(obj);
-            } 
-
-            return View(model);
+                    var item = context.ImgSources.Find(id);
+                    return new ImageModel()
+                    {
+                        Name = item.Name,
+                        Data = item.Data
+                    };
+                }).ToList();
+                return View(model);
+            }
         }
 
         public ActionResult Convert()
         {
-            var files = Directory.GetFiles(Server.MapPath("~/Content/Img"), "*.jpg");
-
+            var files = GetImgFiles();
             using (var context = new ProfileSampleEntities())
             {
-                foreach (var file in files)
+                files.ToList().ForEach(file =>
                 {
-                    using (var stream = new FileStream(file, FileMode.Open))
-                    {
-                        byte[] buff = new byte[stream.Length];
-
-                        stream.Read(buff, 0, (int) stream.Length);
-
-                        var entity = new ImgSource()
-                        {
-                            Name = Path.GetFileName(file),
-                            Data = buff,
-                        };
-
-                        context.ImgSources.Add(entity);
-                        context.SaveChanges();
-                    }
-                } 
+                    var buff = ReadFilesBytes(file);
+                    saveImgToDb(context, file, buff);
+                });
             }
 
             return RedirectToAction("Index");
+        }
+        private string[] GetImgFiles()
+        {
+            var path = Server.MapPath("~/Content/Img");
+            return Directory.GetFiles(path, "*.jpg");
+        }
+        private byte[] ReadFilesBytes(string file)
+        {
+
+            return System.IO.File.ReadAllBytes(file);
+        }
+        private void saveImgToDb(ProfileSampleEntities context, string file, byte[] buff)
+        {
+            var filename = Path.GetFileName(file);
+            var entity = new ImgSource()
+            {
+                Name = filename,
+                Data = buff
+            };
+            context.ImgSources.Add(entity);
+            context.SaveChanges();
         }
 
         public ActionResult Contact()
